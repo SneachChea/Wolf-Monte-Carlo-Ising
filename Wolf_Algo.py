@@ -1,10 +1,9 @@
 
 
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
+import os
 import sys
-
 
 def square_neighbors(L):
     N = L*L
@@ -58,31 +57,50 @@ def from_S_to_latt(S,L,site,xy):
 
 def save_latt(T, S,L,site,xy, keyword="Square"):
     lat = from_S_to_latt(S,L,site,xy)
-    g=open(keyword+"lat"+str(T)+".dat","w")
+    g=open(keyword+"/"+keyword+"lat"+str(T)+".dat","w")
     for i in range(L):
         for j in range(L):
             g.write("{:} ".format(lat[i,j]))
         g.write("\n")
     g.close()
 
+def check_dir_create(name):
+    if(not os.path.isdir("./"+name)):
+        os.mkdir(name)
+
 
 # ** Parse. Get the input for the simulation .
 # TODO: Add an option that allows the selection of the lattice geometry
 parser = argparse.ArgumentParser(description='Parameters for Monte-Carlo simulation:')
 parser.add_argument("-L",dest ="L", help="Number of spin sites on one direction.", type=int, required=True)
+parser.add_argument("-g",dest ="Lattice", help="Lattice geometry. Either Square or Triangular", type=str, default="Square")
 parser.add_argument("-Ntrial",dest ="Ntrial", help="number of Trial for a Monte-Carlo simulation. Default value =100.",type = int, default = 100)
-parser.add_argument("-Tmin",dest ="Tmin", help="Minimal temperature. Default value = 0.1.",default = 0.1)
-parser.add_argument("-Tmax",dest ="Tmax", help="Maximal temperature. Default value = 10.",default = 10)
+parser.add_argument("-Tmin",dest ="Tmin", help="Minimal temperature. Default value = 0.1.",type = float,default = 0.1)
+parser.add_argument("-Tmax",dest ="Tmax", help="Maximal temperature. Default value = 10.",type=float, default = 10)
 parser.add_argument("-nT",dest ="nT", help="number of step in temperature. Default value = 10.",type = int, default = 10)
 
 
 args = parser.parse_args()
-L = args.L
 
+if(args.Lattice != "Square" and args.Lattice!="Triangular"):
+    print(args.Lattice)
+    print("Not sure about the geometry. Please set the -g parameter to 'Square' or 'Triangular'.")
+    sys.exit()
+
+
+# * Initialization of variables
+L = args.L
 N= L*L
 T_num = np.linspace(args.Tmin,args.Tmax,args.nT)
 N_trials = args.Ntrial
-nbr, site_dic ,x_y_dic = square_neighbors(L)
+if(args.Lattice=="Triangular"):
+    nbr, site_dic ,x_y_dic = triangular_neighbors(L)
+    keyW = "triangular"
+else:
+    nbr, site_dic ,x_y_dic = square_neighbors(L)
+    keyW = "square"
+
+check_dir_create(keyW)
 
 Magnetization = []
 M = []
@@ -92,10 +110,9 @@ E_n = []
 E_sq_n = []
 E=[]
 Cv = []
-
-keyW = "square"
-mag = open(keyW+"Magnetization.dat","w")
-cl = open(keyW+"Cluster_size.dat","w")
+Mvar = []
+mag = open(keyW+"/"+keyW+"Magnetization.dat","w")
+cl = open(keyW+"/"+keyW+"Cluster_size.dat","w")
 
 
 for t in T_num:
@@ -127,7 +144,9 @@ for t in T_num:
     save_latt(t,S,L,site_dic,x_y_dic, keyW)
     Mean_cluster_size.append(np.mean(N_cluster_size))
     M.append(np.mean(Magnetization)/N)
-    mag.write("{:.10}\t{:.10}\n".format(t, M[-1]))
+    Mvar.append(np.var(Magnetization)/(N*N))
+
+    mag.write("{:.10}\t{:.10}\t{:.10}\n".format(t, M[-1], Mvar[-1]))
     cl.write("{:.10}\t{:.10}\n".format(t, Mean_cluster_size[-1]))
 
 

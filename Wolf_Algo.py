@@ -2,6 +2,7 @@
 
 import numpy as np
 import argparse
+import matplotlib.pyplot as plt
 import os
 import sys
 
@@ -70,7 +71,7 @@ def check_dir_create(name):
 
 
 # ** Parse. Get the input for the simulation .
-# TODO: Add an option that allows the selection of the lattice geometry
+
 parser = argparse.ArgumentParser(description='Parameters for Monte-Carlo simulation:')
 parser.add_argument("-L",dest ="L", help="Number of spin sites on one direction.", type=int, required=True)
 parser.add_argument("-g",dest ="Lattice", help="Lattice geometry. Either Square or Triangular", type=str, default="Square")
@@ -103,25 +104,27 @@ else:
 check_dir_create(keyW)
 
 Magnetization = []
-M = []
+
 N_cluster_size = []
 Mean_cluster_size = []
 E_n = []
 E_sq_n = []
 E=[]
 Cv = []
-Mvar = []
+M = np.zeros(args.nT)
+Mvar = np.zeros(args.nT)
 mag = open(keyW+"/"+keyW+"Magnetization.dat","w")
 cl = open(keyW+"/"+keyW+"Cluster_size.dat","w")
 
 
-for t in T_num:
+for i in range(args.nT):
+    t = T_num[i]
     print("temperature = ",t)
     beta = 1./t
     p = 1-np.exp(-2*beta)
     S = [np.random.choice([-1,1]) for _ in range(N)]
-    N_cluster_size = []
-    Magnetization = []
+    N_cluster_size = np.zeros(N_trials)
+    Magnetization = np.zeros(N_trials)
     for itera in range(N_trials):
         k=np.random.randint(0,N)
         Pocket = [k]
@@ -137,14 +140,14 @@ for t in T_num:
                             Pocket.append(l)
                             Cluster.append(l)
             Pocket.remove(s)
-        N_cluster_size.append(len(Cluster))
+        N_cluster_size[itera] = len(Cluster)
         for s in Cluster:
             S[s] = - S[s]
-        Magnetization.append(abs(np.sum([S[s] for s in range(N)])))
+        Magnetization[itera] =abs(np.sum([S[s] for s in range(N)]))
     save_latt(t,S,L,site_dic,x_y_dic, keyW)
     Mean_cluster_size.append(np.mean(N_cluster_size))
-    M.append(np.mean(Magnetization)/N)
-    Mvar.append(np.var(Magnetization)/(N*N))
+    M[i] = np.mean(Magnetization)/N
+    Mvar[i] = np.var(Magnetization/N)/N
 
     mag.write("{:.10}\t{:.10}\t{:.10}\n".format(t, M[-1], Mvar[-1]))
     cl.write("{:.10}\t{:.10}\n".format(t, Mean_cluster_size[-1]))
@@ -152,3 +155,10 @@ for t in T_num:
 
 mag.close()
 cl.close()
+# ** Plotting Data
+
+plt.figure()
+plt.errorbar(T_num, M, yerr=np.sqrt(Mvar),fmt='x--')
+plt.title("Magnetization as a function of temperature for the "+str(L)+"x"+str(L)+" "+keyW+" lattice.")
+plt.show()
+plt.savefig(keyW+"Magnetization.pdf")
